@@ -1,0 +1,50 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Скачиваем код репозитория
+        uses: actions/checkout@v4
+
+      - name: Устанавливаем Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Устанавливаем Poetry
+        run: pip install poetry
+
+      - name: Устанавливаем зависимости проекта
+  
+        run: poetry install --no-interaction --no-root
+
+      - name: Подготовка к сборке Docker-образа
+        id: prep
+        run: |
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          echo "image_id=$IMAGE_ID" >> $GITHUB_OUTPUT
+
+      - name: Логинимся в GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }} 
+          password: ${{ secrets.GITHUB_TOKEN }} 
+
+      - name: Собираем и пушим Docker-образ в GCR
+        uses: docker/build-push-action@v5
+        with:
+            context: .
+            push: true
+            tags: ${{ steps.prep.outputs.image_id }}:latest
