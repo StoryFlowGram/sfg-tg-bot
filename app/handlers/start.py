@@ -15,5 +15,5 @@ async def echo_start(message: types.Message):
     web_app_url = os.getenv("WEB_APP_URL")
     button = InlineKeyboardButton(text="Open WebApp", web_app=WebAppInfo(url=web_app_url))
     kb = InlineKeyboardMarkup(inline_keyboard=[[button]])
-    await message.answer("Добро пожаловать в StoryFluentGram:", reply_markup=kb)
+    await message.answer("Ласкаво просимо до StoryFluentGram:", reply_markup=kb)
     
