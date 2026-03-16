@@ -13,38 +13,65 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Скачиваем код репозитория
+      - name: Завантажуємо код репозиторію
         uses: actions/checkout@v4
 
-      - name: Устанавливаем Python 3.12
+      - name: Встановлюємо Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Устанавливаем Poetry
+      - name: Встановлюємо Poetry
         run: pip install poetry
 
-      - name: Устанавливаем зависимости проекта
+      - name: Встановлюємо залежності проєкту
   
         run: poetry install --no-interaction --no-root
 
-      - name: Подготовка к сборке Docker-образа
+      - name: Підготовка до збирання Docker-образу
         id: prep
         run: |
           IMAGE_ID=ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
           echo "image_id=$IMAGE_ID" >> $GITHUB_OUTPUT
 
-      - name: Логинимся в GitHub Container Registry
+      - name: Входимо в GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }} 
           password: ${{ secrets.GITHUB_TOKEN }} 
 
-      - name: Собираем и пушим Docker-образ в GCR
+      - name: Збираємо й пушимо Docker-образ у GCR
         uses: docker/build-push-action@v5
         with:
             context: .
             push: true
             tags: ${{ steps.prep.outputs.image_id }}:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test-ci/cd'
+
+    steps:
+      - name: Виконуємо деплой на сервері
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /home/deployer/sfg-app
+
+            # Входимо в GHCR на сервері
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Завантажуємо нові версії образів
+            docker compose -f docker-compose-prod.yml pull
+
+            # Перезапускаємо сервіси
+            docker compose -f docker-compose-prod.yml up -d --remove-orphans
+
+            # Очищаємо старі образи
+            docker image prune -f
