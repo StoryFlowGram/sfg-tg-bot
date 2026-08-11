@@ -204,3 +204,5 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# Ignore k8s secrets
+k8s/**/secret.yaml
